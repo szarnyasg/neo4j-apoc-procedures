@@ -3,21 +3,77 @@
 
 [abstract]
 --
-This section describes functions for working with dates and times.
+This section describes functions for formatting and operating on dates and times.
 --
 
-== Conversion between formatted dates and timestamps
+The date and time procedures retrieve current values, convert formats, set expirations, add/subtract from values, and split components into fields.
+We may use these procedures to pull or send data to/from other systems and compare values.
+The procedures described in this section support standard native Neo4j and Java date formats.
+
+This section includes:
+
+* <<date-available-procedures, Available Procedures>>
+* <<date-parameter-options, Available Parameter Values>>
+* <<add-subtract-date-operations, Addition/Subtraction Date Operations>>
+* <<date-examples, Examples>>
+    ** <<date-conversions, Converting Dates>>
+    ** <<date-formatting, Formatting Dates>>    
+    ** <<date-parsing, Parsing Dates>>
+    ** <<date-fields, Splitting Dates to Fields>>
+
+[[date-available-procedures]]
+== Available Procedures
+
+The table below describes the available procedures:
+
+[separator=¦,opts=header,cols="1,1m,1m,5"]
+|===
+include::../../../build/generated-documentation/apoc.date.csv[]
+|===
+
+[[date-parameter-options]]
+== Available Procedure and Function Parameter Values
+
+In the available procedure list above, there are several parameters with specific values.
+This section will show the available substitutions for different formats to apply to various cases.
 
 [cols="1m,5"]
 |===
-| apoc.date.parse('2015/03/25 03:15:59',['ms'/'s'], ['yyyy/MM/dd HH:mm:ss']) | same as previous, but accepts custom datetime format
-| apoc.date.format(12345, ['ms'/'s'], ['yyyy/MM/dd HH:mm:ss']) | the same as previous, but accepts custom datetime format
-| apoc.date.systemTimezone() | return the system timezone display format string
-| apoc.date.currentTimestamp() | provides current time millis with changing values over a transaction
+| Parameter | Description | Possible Values | Examples
+| `addUnit` | Measurement of units to add or subtract | `ms, s, m, h, d` (long forms: `millis, milliseconds, seconds, minutes, hours, days`) | `h`, `d`, `seconds`
+| `addValue` | The number to add or subtract (for subtraction, use negative numbers) | Any positive or negative integer | `-365`, `30`, `7`, `-24`
+| `convertTo` | Format of date conversion output | Any https://docs.oracle.com/javase/8/docs/api/java/time/format/DateTimeFormatter.html[pre-defined Java format^], https://www.elastic.co/guide/en/elasticsearch/reference/5.5/mapping-date-format.html#built-in-date-formats[built-in format^], or specified pattern | `'yyyy-MM-dd HH:mm:ss.SSS'`, `'iso_date_format'`, `'basic_date'`
+| `currentFormat` or `format` | Format of date to convert | May accept https://docs.oracle.com/javase/8/docs/api/java/time/format/DateTimeFormatter.html[pre-defined Java format^], https://www.elastic.co/guide/en/elasticsearch/reference/5.5/mapping-date-format.html#built-in-date-formats[built-in format^], or specified pattern | `'yyyy-MM-dd HH:mm:ss.SSS'`, `'BASIC_ISO_DATE'`, `'date_time'`
+| `time` | The value to convert or manipulate in time format | Any value often in epoch seconds or millisecond format | `1540944000`, `1582209630000`
+| `timezone` | Specify timezone for result output | Full name values or UTC offsets - see https://en.wikipedia.org/wiki/List_of_tz_database_time_zones[this Wikipedia page] for list | `'America/Toronto'`, `'-05:00'`
+| `toUnit` | Measurement of units for output value | `ms, s, m, h, d` (long forms: `millis, milliseconds, seconds, minutes, hours, days`) | `s`, `days`
+| `unit` | Measurement of units for input value | `ms, s, m, h, d` (long forms: `millis, milliseconds, seconds, minutes, hours, days`) | `milliseconds`, `h`
 |===
 
-* possible unit values: `ms,s,m,h,d` and their long forms `millis,milliseconds,seconds,minutes,hours,days`.
-* possible time zone values: Either an abbreviation such as `PST`, a full name such as `America/Los_Angeles`, or a custom ID such as `GMT-8:00`. Full names are recommended. You can view a list of full names in https://en.wikipedia.org/wiki/List_of_tz_database_time_zones[this Wikipedia page].
+//LEFT OFF HERE!
+== Notes on Values:
+
+.Formats
+* the default format is `yyyy-MM-dd HH:mm:ss`
+* if the format pattern doesn't specify timezone, formatter considers dates to belong to the UTC timezone
+* if the timezone pattern is specified in the input value, the timezone is extracted from the date string, otherwise an error will be reported
+* the `to/fromSeconds` timestamp values are in POSIX (Unix time) system, i.e. timestamps represent the number of seconds elapsed since https://en.wikipedia.org/wiki/Unix_time[00:00:00 UTC, Thursday, 1 January 1970]
+* the full list of supported formats is described in https://docs.oracle.com/javase/8/docs/api/java/text/SimpleDateFormat.html[SimpleDateFormat JavaDoc^]
+
+////
+- apoc.date.parse does NOT take 'months' or 'years' as from unit parameter
+- apoc.date.convert does NOT take 'months' or 'years' as from or to unit parameter
+- apoc.date.expire* procs need to be moved/renamed to apoc.ttl.*
+- apoc.date.add will accept whole number values only (no decimals) and does NOT take 'months' or 'years' for addUnit parameter
+- apoc.date.format only accepts string representations of format parameter, if submit 'd' as format, it only returns that field of the date (does NOT take 'months' or 'years' as the format parameter)
+** unit and format are totally different (unit: 'h', 's', 'd' or 'hours', 'seconds', 'days'...format: 'd' day-of-month, 'y' year)
+** unit is time value (short or long form), format is string representation of component field
+- apoc.date.fromISO8601 requires format of 'yyyy-MM-ddTHH:mm:ss.SSSZ' (include 'T' before time and 'Z' as zone)
+- apoc.date.parseAsZonedDateTime accepts only a UTC timezone value
+- apoc.date.systemTimezone does not accept any arguments
+- apoc.date.toISO8601 unit does NOT take 'months' or 'years' as parameter
+- apoc.date.toYears
+////
 
 == Current timestamp
 
@@ -99,15 +155,6 @@ RETURN apoc.date.fields('2015/01/02_EET', 'yyyy/MM/dd_z') AS output;
     'days': 2
   }
 |===
-
-
-== Notes on formats:
-
-* the default format is `yyyy-MM-dd HH:mm:ss`
-* if the format pattern doesn't specify timezone, formatter considers dates to belong to the UTC timezone
-* if the timezone pattern is specified, the timezone is extracted from the date string, otherwise an error will be reported
-* the `to/fromSeconds` timestamp values are in POSIX (Unix time) system, i.e. timestamps represent the number of seconds elapsed since https://en.wikipedia.org/wiki/Unix_time[00:00:00 UTC, Thursday, 1 January 1970]
-* the full list of supported formats is described in https://docs.oracle.com/javase/8/docs/api/java/text/SimpleDateFormat.html[SimpleDateFormat JavaDoc]
 
 == Reading single datetime field from UTC Epoch:
 
